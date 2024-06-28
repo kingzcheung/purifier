@@ -1,23 +1,34 @@
 use json::{code_generator::CodeGenerator, parser::Parser, value::Json};
 use pyo3::prelude::*;
 
+mod data;
 pub mod json;
 
 pub fn parse(s: &str) -> Json {
-    let mut s1 = s;
     let mut js = Json::Null;
-    for (index, char) in s.chars().enumerate() {
+    // s.chars().enumerate() 得到的索引不是正确的索引
+    for (index, char) in s.char_indices() {
         if char == '{' {
-            s1 = &s[index..];
+            let s1 = &s[index..];
             let mut parser = Parser::new(s1);
             let res = parser.parse();
             match res {
                 Ok(json_raw) => {
+                    if json_raw.is_null() {
+                        continue;
+                    }
+                    if json_raw.is_object() {
+                        if stringify(json_raw.clone()) == "{}" {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
                     js = json_raw;
                     break;
                 }
-                Err(_e) => {
-                    // println!("{:?}",e);
+                Err(e) => {
+                    println!("{:?}",e);
                     continue;
                 }
             }
@@ -49,13 +60,28 @@ fn purifier(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[cfg(test)]
 mod test {
+    use crate::{data::{self, data}, json::value::Json};
+    use serde_json::{Result, Value};
 
     #[test]
     fn test_purifier_parse() {
-        let s = r#"
-        sdfs json```{ s {"name":"沙滩上的女子和狗","category":"宠物用品","packaging":"","tags":["海滩","户外活动"],"compositions":[],"description":"这张照片展示了一位女士在海滩上享受时光时与她的狗狗互动的情景。","shooting_angle":""}```ssdf
-        "#;
-        let res = super::parse(s);
-        println!("{}", super::stringify(res));
+        for (left, right) in data::data {
+            let res = super::parse(left);
+           
+            if res == Json::Null {
+                println!("{:?}", left);
+            }
+            assert!(res != Json::Null);
+            let d = super::stringify(res);
+            let v = serde_json::from_str::<Value>(&d);
+            assert!(v.is_ok())
+        }
+    }
+    #[test]
+    fn test_single_purifier_parse(){
+        let (left,right) = data::data[14];
+        let res = super::parse(left);
+        let d = super::stringify(res);
+        assert!(!d.is_empty())
     }
 }

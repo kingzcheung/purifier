@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 
-use super::tokenizer::Tokenizer;
+use super::{error::JsonError, tokenizer::Tokenizer};
 use super::token::Token;
 use super::value::Json;
 
@@ -53,14 +53,15 @@ impl<'a> Parser<'a> {
             Token::BraceOff => return Ok(object.into()),
             Token::String(key) => {
                 match self.step()? {
-                    Token::Colon => (),
-                    token => panic!("Unexpected token {:?}", token),
-                }
+                    Token::Colon => Ok(()),
+                    token => Err(JsonError::UnexpectedToken(token)),
+                }?;
                 let value = self.parse()?;
                 object.insert(key, value);
+                Ok(())
             }
-            token => panic!("Unexpected token {:?}", token),
-        }
+            token => Err(JsonError::UnexpectedToken(token)),
+        }?;
 
         loop {
             match self.step()? {
